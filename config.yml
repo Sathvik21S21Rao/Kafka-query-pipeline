@@ -1,0 +1,46 @@
+Kafka: "apache"
+bootstrap_servers: "127.0.0.1:9092"
+producer.py:
+  produce_to: "event"
+  linger_ms: 1
+db_insert.py:
+  consume_from: 
+  - "event"
+  - "global_watermark"
+  produce_to: "local_watermarks"
+  offset_reset: "earliest"
+  consumer_group: "db_insert_group"
+  linger_ms: 1
+  max_retries: 1000
+query.py:
+  consume_from: 
+  - "global_watermark"
+  produce_to: "query_results"
+  offset_reset: "earliest"
+  consumer_group: "query_group"
+  linger_ms: 1
+  max_retries: 1000
+global_watermark.py:
+  consume_from:
+  - "local_watermarks"
+  produce_to: "global_watermark"
+  offset_reset: "earliest"
+  consumer_group: "global_watermark_group"
+  linger_ms: 1
+  max_retries: 1000
+result.py:
+  consume_from:
+  - "query_results"
+  offset_reset: "earliest"
+  consumer_group: "result_group"
+  linger_ms: 1
+  max_retries: 1000
+
+num_producers: 5
+num_consumers: 5
+num_partitions: 5
+duration: 30
+mode: "poisson" # mmmp or poisson
+throughputs:
+  - 10000
+  - 20000

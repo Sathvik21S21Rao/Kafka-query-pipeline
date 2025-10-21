@@ -1,0 +1,5 @@
+kafka-python
+matplotlib
+asyncpg
+python-dotenv
+psycopg2-binary
