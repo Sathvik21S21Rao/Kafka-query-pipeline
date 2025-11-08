@@ -1,40 +1,65 @@
 Kafka: "apache"
 bootstrap_servers: "127.0.0.1:9092"
+proc_type: 'sql'
 producer.py:
   produce_to: "event"
   linger_ms: 1
-db_insert.py:
-  consume_from: 
-  - "event"
-  - "global_watermark"
-  produce_to: "local_watermarks"
-  offset_reset: "earliest"
-  consumer_group: "db_insert_group"
-  linger_ms: 1
-  max_retries: 1000
-query.py:
-  consume_from: 
-  - "global_watermark"
-  produce_to: "query_results"
-  offset_reset: "earliest"
-  consumer_group: "query_group"
-  linger_ms: 1
-  max_retries: 1000
-global_watermark.py:
-  consume_from:
-  - "local_watermarks"
-  produce_to: "global_watermark"
-  offset_reset: "earliest"
-  consumer_group: "global_watermark_group"
-  linger_ms: 1
-  max_retries: 1000
-result.py:
-  consume_from:
-  - "query_results"
-  offset_reset: "earliest"
-  consumer_group: "result_group"
-  linger_ms: 1
-  max_retries: 1000
+sql:
+  db_insert.py:
+    consume_from: 
+    - "event"
+    - "global_watermark"
+    produce_to: "local_watermarks"
+    offset_reset: "earliest"
+    consumer_group: "db_insert_group"
+    linger_ms: 1
+    max_retries: 1000
+  query.py:
+    consume_from: 
+    - "global_watermark"
+    produce_to: "query_results"
+    offset_reset: "earliest"
+    consumer_group: "query_group"
+    linger_ms: 1
+    max_retries: 1000
+  global_watermark.py:
+    consume_from:
+    - "local_watermarks"
+    produce_to: "global_watermark"
+    offset_reset: "earliest"
+    consumer_group: "global_watermark_group"
+    linger_ms: 1
+    max_retries: 1000
+  result.py:
+    consume_from:
+    - "query_results"
+    offset_reset: "earliest"
+    consumer_group: "result_group"
+    linger_ms: 1
+    max_retries: 1000
+  topics:
+    event: 
+      num_partitions: 5
+      replication_factor: 1
+    query_results:
+      num_partitions: 5
+      replication_factor: 1
+    local_watermarks:
+      num_partitions: 1
+      replication_factor: 1
+    global_watermark:
+      num_partitions: 1
+      replication_factor: 1
+spark:
+  master: "spark://localhost:7077"
+  app_name: "KafkaSparkSQLApp"
+  topics:
+    event: 
+      num_partitions: 5
+      replication_factor: 1
+    query_results:
+      num_partitions: 5
+      replication_factor: 1
 
 num_producers: 5
 num_consumers: 5

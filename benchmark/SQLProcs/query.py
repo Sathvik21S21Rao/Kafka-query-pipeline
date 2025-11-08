@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 with open('./config.yml') as f:
     cfg = yaml.safe_load(f)
 
-consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="global_watermark_consumer", group_id=cfg['query.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg["query.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
-producer = ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="query_producer", bootstrap_servers=cfg['bootstrap_servers'], value_serializer=lambda m: json.dumps(m).encode('utf-8'), linger_ms=cfg["query.py"]["linger_ms"],enable_idempotence=True)
+consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="global_watermark_consumer", group_id=cfg['sql']['query.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg['sql']["query.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+producer = ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="query_producer", bootstrap_servers=cfg['bootstrap_servers'], value_serializer=lambda m: json.dumps(m).encode('utf-8'), linger_ms=cfg["sql"]["query.py"]["linger_ms"],enable_idempotence=True)
 
 NUM_PARTITIONS = cfg["num_partitions"]
-consumer.subscribe(cfg["query.py"]["consume_from"])
+consumer.subscribe(cfg["sql"]["query.py"]["consume_from"])
 
 conn=psycopg2.connect(
     dbname=os.getenv("DB_NAME"),
@@ -33,7 +33,7 @@ query="""SELECT v.window_id, v.campaign_id, v.views, c.clicks, c.clicks::float/ 
 
 global_watermark=0
 completed_windows=0
-max_retries = cfg["query.py"]["max_retries"]
+max_retries = cfg['sql']["query.py"]["max_retries"]
 retries = 0
 
 while retries < max_retries:
@@ -59,7 +59,7 @@ while retries < max_retries:
 
                     cur.execute(get_max_processing_time_query,(global_watermark,))
                     rows=cur.fetchall()
-                    producer.send(cfg["query.py"]["produce_to"], value={"results":new_events,"max_processing_times":rows})
+                    producer.send(cfg['sql']["query.py"]["produce_to"], value={"results":new_events,"max_processing_times":rows})
                     cur.execute("DELETE FROM events WHERE window_id < %s", (global_watermark,))
                 conn.commit()
                 completed_windows = global_watermark

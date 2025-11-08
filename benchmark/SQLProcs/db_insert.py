@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 with open('./config.yml') as f:
     cfg = yaml.safe_load(f)
 
-producer=ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="db_insert"+sys.argv[1],bootstrap_servers=cfg['bootstrap_servers'],value_serializer=lambda v: json.dumps(v).encode('utf-8'),linger_ms=cfg["db_insert.py"]["linger_ms"],enable_idempotence=True)
-consumer=ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="consumer_db_insert"+sys.argv[1], group_id=cfg['db_insert.py']['consumer_group'],bootstrap_servers=cfg['bootstrap_servers'],auto_offset_reset=cfg["db_insert.py"]["offset_reset"],enable_auto_commit=True,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
-consumer.subscribe(cfg["db_insert.py"]["consume_from"])
+producer=ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="db_insert"+sys.argv[1],bootstrap_servers=cfg['bootstrap_servers'],value_serializer=lambda v: json.dumps(v).encode('utf-8'),linger_ms=cfg["sql"]["db_insert.py"]["linger_ms"],enable_idempotence=True)
+consumer=ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="consumer_db_insert"+sys.argv[1], group_id=cfg['sql']['db_insert.py']['consumer_group'],bootstrap_servers=cfg['bootstrap_servers'],auto_offset_reset=cfg["sql"]["db_insert.py"]["offset_reset"],enable_auto_commit=True,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+consumer.subscribe(cfg["sql"]["db_insert.py"]["consume_from"])
 throughput=int(sys.argv[2])
-max_retries = cfg["db_insert.py"]["max_retries"]
+max_retries = cfg['sql']["db_insert.py"]["max_retries"]
 retry_count = 0
 total_producer_to_kafka_latency=0
 total_events=0
@@ -65,13 +65,13 @@ while retry_count < max_retries:
                     conn.commit()
 
                     local_watermark = min([e["window_id"] for e in buffer])
-                    producer.send(cfg["db_insert.py"]["produce_to"], value={"partition":message.partition,"watermark": local_watermark,"current_time":time.time_ns()//1_000_000})
+                    producer.send(cfg['sql']["db_insert.py"]["produce_to"], value={"partition":message.partition,"watermark": local_watermark,"current_time":time.time_ns()//1_000_000})
                     producer.flush()
                     buffer.clear()
                 
                 if len(buffer)%(throughput//100)==0 and buffer:
                     local_watermark = min([e["window_id"] for e in buffer])
-                    producer.send(cfg["db_insert.py"]["produce_to"], value={"partition":message.partition,"watermark": local_watermark,"current_time":time.time_ns()//1_000_000})
+                    producer.send(cfg['sql']["db_insert.py"]["produce_to"], value={"partition":message.partition,"watermark": local_watermark,"current_time":time.time_ns()//1_000_000})
                 
             
             else:

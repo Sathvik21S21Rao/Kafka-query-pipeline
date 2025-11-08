@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 with open('./config.yml') as f:
     cfg = yaml.safe_load(f)
 
-consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="local_watermark_consumer", group_id=cfg['global_watermark.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg["global_watermark.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
-producer = ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="global_watermark_producer", bootstrap_servers=cfg['bootstrap_servers'], value_serializer=lambda m: json.dumps(m).encode('utf-8'), linger_ms=cfg["global_watermark.py"]["linger_ms"],enable_idempotence=True)
+consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="local_watermark_consumer", group_id=cfg['sql']['global_watermark.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg["sql"]["global_watermark.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+producer = ProducerFactory.get_producer(producer_type=cfg["Kafka"], producer_id="global_watermark_producer", bootstrap_servers=cfg['bootstrap_servers'], value_serializer=lambda m: json.dumps(m).encode('utf-8'), linger_ms=cfg["sql"]["global_watermark.py"]["linger_ms"],enable_idempotence=True)
 NUM_PARTITIONS = cfg["num_partitions"]
-consumer.subscribe(cfg["global_watermark.py"]["consume_from"])
+consumer.subscribe(cfg["sql"]["global_watermark.py"]["consume_from"])
 
 local_watermarks = {i: float('inf') for i in range(NUM_PARTITIONS)}
-max_retries = cfg["global_watermark.py"]["max_retries"]
+max_retries = cfg["sql"]["global_watermark.py"]["max_retries"]
 retry_count = 0
 total_producer_to_kafka_latency=0
 total_events=0
@@ -38,7 +38,7 @@ while retry_count < max_retries:
             total_producer_to_kafka_latency+=message.timestamp-message.value["current_time"]
             total_events+=1
         if all(w != float('inf') for w in local_watermarks.values()):
-            producer.send(cfg["global_watermark.py"]["produce_to"], value={'watermark': int(min(local_watermarks.values()))})
+            producer.send(cfg['sql']["global_watermark.py"]["produce_to"], value={'watermark': int(min(local_watermarks.values()))})
             local_watermarks = {i: float('inf') for i in range(NUM_PARTITIONS)}
             producer.flush()
 logger.info(f"Global Watermark: Average producer to kafka latency: {total_producer_to_kafka_latency/total_events} ms over {total_events} events")
