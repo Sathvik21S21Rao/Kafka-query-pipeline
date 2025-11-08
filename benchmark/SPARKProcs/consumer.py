@@ -56,8 +56,14 @@ agg = (
 )
 
 output = agg.select(
-    col("campaign_id").cast("string").alias("key"),
-    to_json(struct(col("window.start").alias("window_start"), "campaign_id", "views", "clicks", "ctr")).alias("value")
+    col("window.start").cast("string").alias("key"),
+    to_json(struct(
+        col("window.start").alias("window_start"),
+        col("campaign_id"),
+        col("views"),
+        col("clicks"),
+        col("ctr")
+    )).alias("value")
 )
 
 query = (
