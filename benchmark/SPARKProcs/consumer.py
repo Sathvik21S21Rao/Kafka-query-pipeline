@@ -24,7 +24,7 @@ with open("./config.yml", "r") as f:
 with open("ads_to_campaign_mapping.pkl", "rb") as f:
     ad_to_campaign_mapping = pickle.load(f)
 
-session = pyspark.sql.SparkSession.builder.appName(cfg["spark"]["app_name"]).getOrCreate()
+session = pyspark.sql.SparkSession.builder.appName(cfg["spark"]["app_name"]).master(cfg["spark"]["master"]).getOrCreate()
 
 ad_to_campaign_df = session.createDataFrame(list(ad_to_campaign_mapping.items()), ["ad_id", "campaign_id"])
 ad_to_campaign_df.cache()
