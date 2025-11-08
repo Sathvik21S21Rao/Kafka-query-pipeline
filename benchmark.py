@@ -11,7 +11,7 @@ def run_benchmark(cfg):
     throughputs = cfg["throughputs"]
     for throughput in throughputs:
 
-        dump_data(cfg['proc_type'], throughput)
+        dump_data(proc_type=proc_type.lower())
         cleanup_kafka_topics(topics=cfg[cfg['proc_type']]['topics'],bootstrap_servers=cfg['bootstrap_servers'])
         
         producer_processes = []
