@@ -5,7 +5,7 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-def dump_data(pickle_path="data.pkl",type:str="sql"):
+def dump_data(pickle_path="data.pkl",proc_type="sql"):
     load_dotenv()
 
     user_ids = [str(uuid.uuid4()) for _ in range(10000)]
@@ -24,11 +24,11 @@ def dump_data(pickle_path="data.pkl",type:str="sql"):
         pickle.dump(ad_type_mapping, fh)
         pickle.dump(event_type, fh)
         pickle.dump(campaign_id, fh)
-        
+
     with open("ad_to_campaign_mapping.pkl", "wb") as fh:
         pickle.dump(ad_to_campaign_mapping, fh)
 
-    if type.lower() == "sql":
+    if proc_type.lower() == "sql":
         conn = psycopg2.connect(
             host=os.getenv("DB_HOST"),
             database=os.getenv("DB_NAME"),
