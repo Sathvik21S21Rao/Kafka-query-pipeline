@@ -30,10 +30,10 @@ class SteadyPoissonGenerator:
                 "page_id":random.choice(self.page_ids),
                 "ad_id":random.choice(self.ad_ids),
                 "ad_type":self.ad_type_mapping[random.choice(self.ad_ids)],
-                "ns_time":t,
+                "ns_time":int(t),
                 "ip_address":random.choice(self.ip_addresses),
                 "window_id":windowid,
-                "window_start_time":simulated_time,
+                "window_start_time":int(simulated_time),
                 "event_type":random.choice(self.event_type),
                 "produce_time":int(time.time_ns()/1_000_000)
             }
@@ -90,10 +90,10 @@ class MMMPGenerator:
                         "page_id": random.choice(self.page_ids),
                         "ad_id": random.choice(self.ad_ids),
                         "ad_type": self.ad_type_mapping[random.choice(self.ad_ids)],
-                        "ns_time": t,
+                        "ns_time": int(t),
                         "ip_address": random.choice(self.ip_addresses),
                         "window_id": windowid,
-                        "window_start_time": simulated_time,
+                        "window_start_time": int(simulated_time),
                         "event_type": random.choice(self.event_type),
                         "produce_time": int(time.time_ns()/1_000_000)
                     }
