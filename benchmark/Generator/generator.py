@@ -5,6 +5,8 @@ import logging
 from benchmark.Producer.Producer import Producer
 from typing import List
 
+probs=[0.5,0.3,0.2] # view,click,purchase
+
 class SteadyPoissonGenerator:
     def __init__(self,producer:Producer,throughput:int,user_ids:List[str],page_ids:List[str],ad_ids:List[str],ad_type_mapping:dict,event_type:List[str],topic:str):
         self.producer=producer
@@ -34,7 +36,7 @@ class SteadyPoissonGenerator:
                 "ip_address":random.choice(self.ip_addresses),
                 "window_id":windowid,
                 "window_start_time":int(simulated_time),
-                "event_type":random.choice(self.event_type),
+                "event_type":random.choices(self.event_type,weights=probs)[0],
                 "produce_time":int(time.time_ns()/1_000_000)
             }
             self.producer.send(self.topic,value=event)
@@ -94,7 +96,7 @@ class MMMPGenerator:
                         "ip_address": random.choice(self.ip_addresses),
                         "window_id": windowid,
                         "window_start_time": int(simulated_time),
-                        "event_type": random.choice(self.event_type),
+                        "event_type": random.choices(self.event_type,weights=probs)[0],
                         "produce_time": int(time.time_ns()/1_000_000)
                     }
                     self.producer.send(self.topic, value=event)
@@ -113,11 +115,11 @@ class MMMPGenerator:
                             "page_id": random.choice(self.page_ids),
                             "ad_id": random.choice(self.ad_ids),
                             "ad_type": self.ad_type_mapping[random.choice(self.ad_ids)],
-                            "ns_time": t,
+                            "ns_time": int(t),
                             "ip_address": random.choice(self.ip_addresses),
                             "window_id": windowid,
-                            "window_start_time": simulated_time,
-                            "event_type": random.choice(self.event_type),
+                            "window_start_time": int(simulated_time),
+                            "event_type": random.choices(self.event_type,weights=probs)[0],
                             "produce_time": int(time.time_ns()/1_000_000)
                         }
                         self.producer.send(self.topic, value=event)

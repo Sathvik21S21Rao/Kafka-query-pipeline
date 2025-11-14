@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 with open("./config.yml", 'r') as config_file:
     cfg = yaml.safe_load(config_file)
 
-consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="result_consumer", group_id=cfg['spark']['result.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg['sql']["result.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id="result_consumer", group_id=cfg['spark']['result.py']['consumer_group'], bootstrap_servers=cfg['bootstrap_servers'], auto_offset_reset=cfg['spark']["result.py"]["offset_reset"], enable_auto_commit=True, value_deserializer=lambda m: json.loads(m.decode('utf-8')))
 
 consumer.subscribe(cfg["spark"]["result.py"]["consume_from"])
 
@@ -33,12 +33,7 @@ while retries < max_retries:
             ctr = data.get("ctr")
             max_produce_time=data.get("max_produce_time")
             
-            latencies[window_start]=min(latencies.get(window_start,1e9),timestamp-max_produce_time)
-
-            logger.info("--- New Aggregate Received ---")
-            logger.info(f"Window: {window_start} | Campaign: {campaign_id}")
-            logger.info(f"Views: {views}, Clicks: {clicks}, CTR: {ctr:.4f}")
-            logger.info("------------------------------")
+            latencies[window_start]=max(latencies.get(window_start,0),timestamp-max_produce_time)
 
 
     

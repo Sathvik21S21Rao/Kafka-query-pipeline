@@ -38,8 +38,9 @@ df = (
     .format("kafka")
     .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
     .option("subscribe", "event")
-    .option("startingOffsets", "latest")
-    .option("kafka.request.timeout.ms","500000")
+    .option("kafka.group.id","spark_consumer")
+    .option("startingOffsets", "earliest")
+    .option("kafka.session.timeout.ms","500000")
     .load()
 )
 

@@ -75,5 +75,4 @@ num_partitions: 5
 duration: 40
 mode: "poisson" # mmmp or poisson
 throughputs:
-  - 10000
-  - 20000
+  - 30000
