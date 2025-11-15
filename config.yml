@@ -55,12 +55,9 @@ spark:
   app_name: "KafkaSparkSQLApp"
   topics:
     event: 
-      num_partitions: 4
+      num_partitions: 2
       replication_factor: 1
     query_results:
-      num_partitions: 1
-      replication_factor: 1
-    watermark:
       num_partitions: 1
       replication_factor: 1
   result.py:
@@ -70,21 +67,16 @@ spark:
     consumer_group: "result_group"
     linger_ms: 1
     max_retries: 2000
-  watermark.py:
-    consume_from:
-      - "event"
-    produce_to: "watermark"
-    offset_reset: "earliest"
-    consumer_group: "watermark_group"
-    linger_ms: 1
-    max_retries: 500
   
 
 
 num_producers: 5
 num_consumers: 5
 num_partitions: 5
-duration: 40
-mode: "poisson" # mmmp or poisson
+duration: 100
+mode: "mmmp" # mmmp or poisson
+lambda_H: 45000 
+d_H: 0.5
+d_L: 0.5
 throughputs:
   - 30000

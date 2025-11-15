@@ -5,6 +5,7 @@ import json
 import sys
 import pickle
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ while simulated_time<cfg["duration"]*1e9:
     simulated_time+=1e9
     itr+=1
     windowid=itr//10
+    time.sleep(1)
 
 logger.info(f"Producer {sys.argv[1]} finished sending events.")
 producer.flush()

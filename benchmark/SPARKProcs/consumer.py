@@ -5,6 +5,7 @@ from pyspark.sql.types import StructType, StructField, StringType, LongType, Int
 from pyspark.sql.functions import col, from_json, to_timestamp, window, count, when, to_json, struct, max
 import datetime
 from pyspark.sql.streaming import StreamingQueryListener
+from pyspark.sql.functions import broadcast
 
 # --------------------- CONFIG & SETUP ---------------------
 
@@ -45,50 +46,36 @@ ad_to_campaign_df = session.createDataFrame(
     list(ad_to_campaign_mapping.items()),
     ["ad_id", "campaign_id"]
 )
-ad_to_campaign_df.cache()
 
 
 # --------------------- WATERMARK → KAFKA LISTENER ---------------------
 
 class WatermarkKafkaListener(StreamingQueryListener):
+    def onQueryStarted(self,event):
+        pass
+
+    def onQueryTerminated(self,event):
+        pass
 
     def onQueryProgress(self, event):
         wm = event.progress.eventTime.get("watermark")
 
         if wm:
-            row = [{
+            row = {
                 "batch_id": event.progress.batchId,
                 "processing_time": datetime.datetime.now().isoformat(),
                 "watermark": wm,
                 "input_rows": event.progress.numInputRows
-            }]
+            }
 
-            df_wm = session.createDataFrame(row)
 
-            df_kafka = df_wm.selectExpr(
-                "CAST(batch_id AS STRING) AS key",
-                """to_json(named_struct(
-                        'batch_id', batch_id,
-                        'processing_time', processing_time,
-                        'watermark', watermark,
-                        'input_rows', input_rows
-                )) AS value"""
-            )
 
-            # Push the watermark event to Kafka
-            (
-                df_kafka.write
-                .format("kafka")
-                .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
-                .option("topic", "watermark")
-                .save()
-            )
-
-            print(f"[WM-KAFKA] batch={event.progress.batchId} watermark={wm}")
-
+            print(f"[WM-KAFKA] batch={row['batch_id']} watermark={wm} processing_time={row['processing_time']} input_rows={row['input_rows']}")
 
 session.streams.addListener(WatermarkKafkaListener())
 
+session.conf.set("spark.sql.shuffle.partitions","4")
+session.conf.set("spark.default.parallelism","4")
 
 # --------------------- KAFKA INPUT STREAM ---------------------
 
@@ -107,15 +94,16 @@ df_parsed = df.select(
     from_json(col("value").cast("string"), schema).alias("data")
 ).select("data.*")
 
+
 # Convert ns_time to timestamp and watermark
 df_parsed = (
     df_parsed
     .withColumn("event_time", to_timestamp(col("ns_time") / 1000000000))
-    .withWatermark("event_time", "10 seconds")
+    .withWatermark("event_time", "3 seconds")
 )
 
 # Join with campaign lookup
-events = df_parsed.join(ad_to_campaign_df, "ad_id", "inner")
+events = df_parsed.join(broadcast(ad_to_campaign_df), "ad_id", "inner")
 
 # --------------------- AGGREGATION ---------------------
 

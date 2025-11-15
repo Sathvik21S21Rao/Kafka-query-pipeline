@@ -3,7 +3,7 @@ import yaml
 with open('config.yml', 'r') as f:
     cfg = yaml.safe_load(f)
 
-consumer=ConsumerFactory.get_consumer(consumer_id="spark_watermark_consumer",consumer_type="apache",bootstrap_servers=cfg["kafka"]["bootstrap_servers"],group_id="spark_watermark_group")
+consumer=ConsumerFactory.get_consumer(consumer_id="spark_watermark_consumer",consumer_type="apache",bootstrap_servers=cfg["bootstrap_servers"],group_id="spark_watermark_group")
 
 consumer.subscribe(["watermark"])
 
