@@ -55,7 +55,7 @@ def create_kafka_topics(topics: dict, bootstrap_servers: list | str):
         print(f"Creating topics: {list(missing_topics.keys())}")
         admin_client.create_topics(new_topics, timeout_ms=10000)
         print("Missing topics created successfully!")
-        time.sleep(20)
+        time.sleep(60)
 
     except TopicAlreadyExistsError as e:
         print(f"Some topics already exist: {e}")

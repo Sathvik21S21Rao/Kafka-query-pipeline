@@ -2,7 +2,7 @@ import pyspark
 import yaml
 import pickle
 from pyspark.sql.types import StructType, StructField, StringType, LongType, IntegerType
-from pyspark.sql.functions import col, from_json, to_timestamp, window, count, when, to_json, struct, max
+from pyspark.sql.functions import col, from_json, to_timestamp, window, count, when, to_json, struct, max,unix_timestamp,to_binary
 import datetime
 from pyspark.sql.streaming import StreamingQueryListener
 from pyspark.sql.functions import broadcast
@@ -85,14 +85,15 @@ df = (
 )
 
 df_parsed = df.select(
-    from_json(col("value").cast("string"), schema).alias("data")
-).select("data.*")
+    from_json(col("value").cast("string"), schema).alias("data"),
+    col("timestamp").alias("kafka_timestamp")
+).select("data.*","kafka_timestamp")
 
 
 df_parsed = (
     df_parsed
     .withColumn("event_time", to_timestamp(col("ns_time") / 1000000000))
-    .withWatermark("event_time", "6 seconds")
+    .withWatermark("event_time", "3 seconds")
 )
 
 events = df_parsed.join(broadcast(ad_to_campaign_df), "ad_id", "inner")
@@ -106,6 +107,7 @@ agg = (
     .agg(
         count(when(col("event_type") == "view", True)).alias("views"),
         count(when(col("event_type") == "click", True)).alias("clicks"),
+        max(unix_timestamp(col("kafka_timestamp"))*1000).cast("long").alias("max_proc_time"),
         max(col("produce_time")).alias("max_produce_time")
     )
     .withColumn("ctr", col("clicks") / (col("views") + 1))
@@ -114,25 +116,34 @@ agg = (
 
 output = agg.select(
     col("window.start").cast("string").alias("key"),
-    to_json(struct(
-        col("window.start").alias("window_start"),
-        col("campaign_id"),
-        col("views"),
-        col("clicks"),
-        col("ctr"),
-        col("max_produce_time")
-    )).alias("value")
+    to_binary(
+        to_json(struct(
+            col("window.start").alias("window_start"),
+            col("campaign_id"),
+            col("views"),
+            col("clicks"),
+            col("ctr"),
+            col("max_produce_time"),
+            col("max_proc_time")
+        ))
+    ).alias("value")
 )
-
 query = (
     output.writeStream
     .format("kafka")
-    .outputMode("append")
+    .outputMode("update")
     .option("checkpointLocation", "/tmp/spark/checkpoints/campaign_agg_query")
     .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
     .option("topic", "query_results")
     .trigger(processingTime="10 seconds")
     .start()
 )
+
+#query=(
+ #       output.writeStream
+  #      .format("console")
+   #     .outputMode("update")
+    #    .start()
+    #)
 
 query.awaitTermination()

@@ -14,7 +14,8 @@ consumer = ConsumerFactory.get_consumer(consumer_type=cfg["Kafka"], consumer_id=
 
 consumer.subscribe(cfg["spark"]["result.py"]["consume_from"])
 
-latencies = {}
+end_to_end_latencies = {}
+query_time_latencies={}
 retries = 0
 max_retries = cfg["spark"]["result.py"]["max_retries"]
 while retries < max_retries:
@@ -32,10 +33,12 @@ while retries < max_retries:
             clicks = data.get("clicks")
             ctr = data.get("ctr")
             max_produce_time=data.get("max_produce_time")
-            
-            latencies[window_start]=max(latencies.get(window_start,0),timestamp-max_produce_time)
+            max_proc_time=data.get("max_proc_time")
+
+            end_to_end_latencies[window_start]=max(end_to_end_latencies.get(window_start,0),timestamp-max_produce_time)
+            query_time_latencies[window_start]=max(query_time_latencies.get(window_start,0),timestamp-max_proc_time)
     retries = 0  
 
     
-logger.info(f"Result.py: {latencies}")
+logger.info(f"Result.py: {end_to_end_latencies}\n{query_time_latencies}")
 
