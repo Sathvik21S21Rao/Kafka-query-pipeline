@@ -60,6 +60,9 @@ spark:
     query_results:
       num_partitions: 1
       replication_factor: 1
+    watermark:
+      num_partitions: 1
+      replication_factor: 1
   result.py:
     consume_from:
       - "query_results"
@@ -67,6 +70,7 @@ spark:
     consumer_group: "result_group"
     linger_ms: 1
     max_retries: 2000
+  
 
 
 num_producers: 5

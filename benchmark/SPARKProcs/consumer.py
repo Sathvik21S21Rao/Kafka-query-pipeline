@@ -2,9 +2,11 @@ import pyspark
 import yaml
 import pickle
 from pyspark.sql.types import StructType, StructField, StringType, LongType, IntegerType
-from pyspark.sql.functions import col, from_json, to_timestamp, window, count, when, to_json, struct,max
-import logging
-import time
+from pyspark.sql.functions import col, from_json, to_timestamp, window, count, when, to_json, struct, max
+import datetime
+from pyspark.sql.streaming import StreamingQueryListener
+
+# --------------------- CONFIG & SETUP ---------------------
 
 # Define schema
 schema = StructType([
@@ -20,42 +22,117 @@ schema = StructType([
     StructField("produce_time", LongType())
 ])
 
-
+# Load config
 with open("./config.yml", "r") as f:
     cfg = yaml.safe_load(f)
 
+# Load ad→campaign mapping
 with open("./ad_to_campaign_mapping.pkl", "rb") as f:
     ad_to_campaign_mapping = pickle.load(f)
 
-session = pyspark.sql.SparkSession.builder.appName(cfg["spark"]["app_name"]).master(cfg["spark"]["master"]).getOrCreate()
+# Initialize Spark
+session = (
+    pyspark.sql.SparkSession.builder
+    .appName(cfg["spark"]["app_name"])
+    .master(cfg["spark"]["master"])
+    .getOrCreate()
+)
+
 session.sparkContext.setLogLevel("WARN")
-ad_to_campaign_df = session.createDataFrame(list(ad_to_campaign_mapping.items()), ["ad_id", "campaign_id"])
+
+# Create static lookup DF
+ad_to_campaign_df = session.createDataFrame(
+    list(ad_to_campaign_mapping.items()),
+    ["ad_id", "campaign_id"]
+)
 ad_to_campaign_df.cache()
 
-# Read Kafka stream
+
+# --------------------- WATERMARK → KAFKA LISTENER ---------------------
+
+class WatermarkKafkaListener(StreamingQueryListener):
+
+    def onQueryProgress(self, event):
+        wm = event.progress.eventTime.get("watermark")
+
+        if wm:
+            row = [{
+                "batch_id": event.progress.batchId,
+                "processing_time": datetime.datetime.now().isoformat(),
+                "watermark": wm,
+                "input_rows": event.progress.numInputRows
+            }]
+
+            df_wm = session.createDataFrame(row)
+
+            df_kafka = df_wm.selectExpr(
+                "CAST(batch_id AS STRING) AS key",
+                """to_json(named_struct(
+                        'batch_id', batch_id,
+                        'processing_time', processing_time,
+                        'watermark', watermark,
+                        'input_rows', input_rows
+                )) AS value"""
+            )
+
+            # Push the watermark event to Kafka
+            (
+                df_kafka.write
+                .format("kafka")
+                .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
+                .option("topic", "watermark")
+                .save()
+            )
+
+            print(f"[WM-KAFKA] batch={event.progress.batchId} watermark={wm}")
+
+
+session.streams.addListener(WatermarkKafkaListener())
+
+
+# --------------------- KAFKA INPUT STREAM ---------------------
+
 df = (
     session.readStream
     .format("kafka")
     .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
     .option("subscribe", "event")
-    .option("kafka.group.id","spark_consumer")
+    .option("kafka.group.id", "spark_consumer")
     .option("startingOffsets", "earliest")
-    .option("kafka.session.timeout.ms","500000")
+    .option("kafka.session.timeout.ms", "500000")
     .load()
 )
 
-df_parsed = df.select(from_json(col("value").cast("string"), schema).alias("data")).select("data.*")
-df_parsed = df_parsed.withColumn("event_time", to_timestamp(col("ns_time") / 1000000000)).withWatermark("event_time", "10 seconds")
-events=df_parsed.join(ad_to_campaign_df,"ad_id","inner")
+df_parsed = df.select(
+    from_json(col("value").cast("string"), schema).alias("data")
+).select("data.*")
+
+# Convert ns_time to timestamp and watermark
+df_parsed = (
+    df_parsed
+    .withColumn("event_time", to_timestamp(col("ns_time") / 1000000000))
+    .withWatermark("event_time", "10 seconds")
+)
+
+# Join with campaign lookup
+events = df_parsed.join(ad_to_campaign_df, "ad_id", "inner")
+
+# --------------------- AGGREGATION ---------------------
+
 agg = (
-    events.groupBy(window(col("event_time"), "10 seconds"), col("campaign_id"))
+    events.groupBy(
+        window(col("event_time"), "10 seconds"),
+        col("campaign_id")
+    )
     .agg(
         count(when(col("event_type") == "view", True)).alias("views"),
         count(when(col("event_type") == "click", True)).alias("clicks"),
         max(col("produce_time")).alias("max_produce_time")
     )
-    .withColumn("ctr",col("clicks") / (col("views")+1))
+    .withColumn("ctr", col("clicks") / (col("views") + 1))
 )
+
+# --------------------- OUTPUT TO KAFKA ---------------------
 
 output = agg.select(
     col("window.start").cast("string").alias("key"),
@@ -78,4 +155,5 @@ query = (
     .option("topic", "query_results")
     .start()
 )
+
 query.awaitTermination()
