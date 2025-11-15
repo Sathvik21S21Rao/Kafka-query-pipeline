@@ -12,7 +12,12 @@ retries = 0
 
 while retries < max_retries:
     msg = consumer.poll(timeout_ms=100)
+    if not msg:
+        retries += 1
+        continue
+    retries=0
     for topic_partition, messages in msg.items():
         for message in messages:
             print(f"[WM-CONSUMER] Received watermark message: {message.value}")
 
+consumer.close()    

@@ -34,7 +34,7 @@ while retries < max_retries:
             max_produce_time=data.get("max_produce_time")
             
             latencies[window_start]=max(latencies.get(window_start,0),timestamp-max_produce_time)
-
+    retries = 0  
 
     
 logger.info(f"Result.py: {latencies}")
