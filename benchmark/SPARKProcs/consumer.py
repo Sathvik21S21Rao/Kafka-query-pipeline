@@ -99,7 +99,7 @@ df_parsed = df.select(
 df_parsed = (
     df_parsed
     .withColumn("event_time", to_timestamp(col("ns_time") / 1000000000))
-    .withWatermark("event_time", "3 seconds")
+    .withWatermark("event_time", "10 seconds")
 )
 
 # Join with campaign lookup
