@@ -1,102 +1,129 @@
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment, EnvironmentSettings, DataTypes
+from pyflink.table import expressions as expr
+import yaml
+import pickle
+
+
+
+with open("./config.yml", "r") as f:
+    cfg = yaml.safe_load(f)
+
+with open("./ad_to_campaign_mapping.pkl", "rb") as f:
+    ad_to_campaign_mapping = pickle.load(f)
+
+lookup_rows = [(k, v) for k, v in ad_to_campaign_mapping.items()]
+
+
+env = StreamExecutionEnvironment.get_execution_environment()
+env.set_parallelism(2)
+
+settings = (
+    EnvironmentSettings
+    .new_instance()
+    .in_streaming_mode()
+    .build()
+)
+
+t_env = StreamTableEnvironment.create(stream_execution_environment=env,
+                                      environment_settings=settings)
+
+
+lookup_schema = DataTypes.ROW([
+    DataTypes.FIELD("ad_id", DataTypes.STRING()),
+    DataTypes.FIELD("campaign_id", DataTypes.STRING())
+])
+
+lookup_table = t_env.from_elements(lookup_rows, lookup_schema)
+t_env.create_temporary_view("ad_to_campaign", lookup_table)
+
+source_ddl = f"""
+CREATE TABLE events (
+    user_id STRING,
+    page_id STRING,
+    ad_id STRING,
+    ad_type STRING,
+    ns_time BIGINT,
+    ip_address STRING,
+    window_id INT,
+    window_start_time BIGINT,
+    event_type STRING,
+    produce_time BIGINT,
+
+    -- Convert ns → timestamp_ltz
+    event_time AS TO_TIMESTAMP_LTZ(ns_time / 1000000000, 3),
+
+    -- Flink 2.0 watermark
+    WATERMARK FOR event_time AS event_time - INTERVAL '10' SECOND
+)
+WITH (
+    'connector' = 'kafka',
+    'topic' = 'event',
+    'properties.bootstrap.servers' = '{cfg["bootstrap_servers"]}',
+    'properties.group.id' = 'flink_consumer',
+    'scan.startup.mode' = 'earliest-offset',
+    'format' = 'json'
+);
 """
-PyFlink streaming job that reads JSON events from Kafka topic `event`, aggregates
-counts of `view` and `click` per `window_id` and `campaign_id`, computes CTR,
-and writes JSON results to Kafka topic `query_results`.
 
-Assumptions:
-- Events are JSON objects with at least these fields:
-  - window_id (integer)
-  - campaign_id (string)
-  - event_type (string) either 'view' or 'click'
-  - produce_time (long milliseconds since epoch) optional
-- Kafka broker at 127.0.0.1:9092 (adjust in DDL if different)
-- PyFlink and the Kafka connector are available in the runtime environment.
+t_env.execute_sql(source_ddl)
 
-Run (example):
-  # from the project root, with PyFlink installed
-  python benchmark/flink_query.py
 
-You can also submit this to a Flink cluster with `flink run -py benchmark/flink_query.py`.
+
+sink_ddl = f"""
+CREATE TABLE query_results (
+    `key` STRING,
+    `value` STRING
+)
+WITH (
+    'connector' = 'kafka',
+    'topic' = 'query_results',
+    'properties.bootstrap.servers' = '{cfg["bootstrap_servers"]}',
+    'format' = 'raw'
+);
 """
 
-from pyflink.table import EnvironmentSettings, TableEnvironment
+t_env.execute_sql(sink_ddl)
 
 
-def main():
-    # create a streaming TableEnvironment (Blink planner)
-    env_settings = EnvironmentSettings.in_streaming_mode()
-    t_env = TableEnvironment.create(env_settings)
 
-    # Kafka source: events
-    # The JSON format will try to parse fields by name. Adjust schema as needed.
-    t_env.execute_sql("""
-    CREATE TABLE events (
-      `window_id` BIGINT,
-      `campaign_id` STRING,
-      `ad_id` STRING,
-      `event_type` STRING,
-      `ns_time` BIGINT,
-      `produce_time` BIGINT,
-      -- optional processing time column if needed
-      `proc_time` AS PROCTIME()
-    ) WITH (
-      'connector' = 'kafka',
-      'topic' = 'event',
-      'properties.bootstrap.servers' = '127.0.0.1:9092',
-      'properties.group.id' = 'flink_query_group',
-      'scan.startup.mode' = 'earliest-offset',
-      'format' = 'json',
-      'json.ignore-parse-errors' = 'true'
-    )
-    """)
-
-    # Kafka sink: aggregated query_results
-    # We'll output JSON with fields that result consumers expect
-    t_env.execute_sql("""
-    CREATE TABLE query_results (
-      `window_start` BIGINT,
-      `campaign_id` STRING,
-      `views` BIGINT,
-      `clicks` BIGINT,
-      `ctr` DOUBLE,
-      `max_produce_time` BIGINT
-    ) WITH (
-      'connector' = 'kafka',
-      'topic' = 'query_results',
-      'properties.bootstrap.servers' = '127.0.0.1:9092',
-      'format' = 'json'
-    )
-    """)
-
-    # Aggregation: count views and clicks per (window_id, campaign_id)
-    # Compute CTR as clicks / NULLIF(views, 0)
-    insert_sql = """
-    INSERT INTO query_results
+query = t_env.sql_query("""
+SELECT
+    CAST(window_start AS STRING) AS `key`,
+    TO_JSON(
+        ROW(
+            window_start,
+            campaign_id,
+            views,
+            clicks,
+            ctr,
+            max_produce_time
+        )
+    ) AS `value`
+FROM (
     SELECT
-      window_id AS window_start,
-      campaign_id,
-      SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END) AS views,
-      SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END) AS clicks,
-      CAST(SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END) AS DOUBLE) /
-        NULLIF(SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END), 0) AS ctr,
-      MAX(produce_time) AS max_produce_time
-    FROM events
-    GROUP BY window_id, campaign_id
-    """
+        window_start,
+        window_end,
+        ac.campaign_id AS campaign_id,
 
-    # Submit the continuous insert query
-    t_env.execute_sql(insert_sql)
+        COUNT(CASE WHEN e.event_type = 'view' THEN 1 END) AS views,
+        COUNT(CASE WHEN e.event_type = 'click' THEN 1 END) AS clicks,
 
-    # Some environments require explicitly executing the job. If supported, you
-    # can call t_env.execute(job_name). The insert_sql above typically starts
-    # the job in interactive Python environments.
-    try:
-        # Attempt to call explicit execute if available
-        t_env.execute('FlinkKafkaQueryJob')
-    except Exception:
-        # Not all PyFlink versions require or expose execute(); ignore if not supported.
-        pass
+        MAX(e.produce_time) AS max_produce_time,
+
+        CAST(COUNT(CASE WHEN e.event_type = 'click' THEN 1 END) AS DOUBLE)
+        / (COUNT(CASE WHEN e.event_type = 'view' THEN 1 END) + 1)
+        AS ctr
+
+    FROM TABLE(
+        TUMBLE(TABLE events, DESCRIPTOR(event_time), INTERVAL '10' SECOND)
+    ) AS e
+    JOIN ad_to_campaign AS ac
+    ON e.ad_id = ac.ad_id
+
+    GROUP BY window_start, window_end, ac.campaign_id
+);
+""")
 
 
-if __name__ == '__main__':
-    main()
+query.execute_insert("query_results").wait()

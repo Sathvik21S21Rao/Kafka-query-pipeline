@@ -74,8 +74,8 @@ num_producers: 5
 num_consumers: 5
 num_partitions: 5
 duration: 100
-mode: "mmmp" # mmmp or poisson
+mode: "poisson" # mmmp or poisson
 d_H: 0.5
 d_L: 0.5
 throughputs:
-  - 30000
+  - 10000

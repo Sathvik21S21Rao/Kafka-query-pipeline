@@ -48,8 +48,6 @@ ad_to_campaign_df = session.createDataFrame(
 )
 
 
-# --------------------- WATERMARK → KAFKA LISTENER ---------------------
-
 class WatermarkKafkaListener(StreamingQueryListener):
     def onQueryStarted(self,event):
         pass
@@ -67,9 +65,6 @@ class WatermarkKafkaListener(StreamingQueryListener):
                 "watermark": wm,
                 "input_rows": event.progress.numInputRows
             }
-
-
-
             print(f"[WM-KAFKA] batch={row['batch_id']} watermark={wm} processing_time={row['processing_time']} input_rows={row['input_rows']}")
 
 session.streams.addListener(WatermarkKafkaListener())
@@ -77,7 +72,6 @@ session.streams.addListener(WatermarkKafkaListener())
 session.conf.set("spark.sql.shuffle.partitions","4")
 session.conf.set("spark.default.parallelism","4")
 
-# --------------------- KAFKA INPUT STREAM ---------------------
 
 df = (
     session.readStream
@@ -95,17 +89,14 @@ df_parsed = df.select(
 ).select("data.*")
 
 
-# Convert ns_time to timestamp and watermark
 df_parsed = (
     df_parsed
     .withColumn("event_time", to_timestamp(col("ns_time") / 1000000000))
-    .withWatermark("event_time", "10 seconds")
+    .withWatermark("event_time", "6 seconds")
 )
 
-# Join with campaign lookup
 events = df_parsed.join(broadcast(ad_to_campaign_df), "ad_id", "inner")
 
-# --------------------- AGGREGATION ---------------------
 
 agg = (
     events.groupBy(
@@ -120,7 +111,6 @@ agg = (
     .withColumn("ctr", col("clicks") / (col("views") + 1))
 )
 
-# --------------------- OUTPUT TO KAFKA ---------------------
 
 output = agg.select(
     col("window.start").cast("string").alias("key"),
@@ -141,6 +131,7 @@ query = (
     .option("checkpointLocation", "/tmp/spark/checkpoints/campaign_agg_query")
     .option("kafka.bootstrap.servers", cfg["bootstrap_servers"])
     .option("topic", "query_results")
+    .trigger(processingTime="10 seconds")
     .start()
 )
 
