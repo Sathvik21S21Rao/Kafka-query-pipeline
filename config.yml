@@ -75,7 +75,6 @@ num_consumers: 5
 num_partitions: 5
 duration: 100
 mode: "mmmp" # mmmp or poisson
-lambda_H: 45000 
 d_H: 0.5
 d_L: 0.5
 throughputs:

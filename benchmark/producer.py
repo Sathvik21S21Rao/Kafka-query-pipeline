@@ -24,7 +24,7 @@ with open('./config.yml') as f:
     if cfg["mode"]=="poisson":
         gen=generator.SteadyPoissonGenerator(throughput=int(sys.argv[2]),producer=producer,user_ids=user_ids,page_ids=page_ids,ad_ids=ad_ids,ad_type_mapping=ad_type_mapping,event_type=event_type, topic=cfg["producer.py"]["produce_to"])
     elif cfg["mode"]=="mmmp":
-        gen=generator.MMMPGenerator(throughput=int(sys.argv[2]),producer=producer,lambda_H=cfg["lambda_H"],d_H=cfg["d_H"],d_L=cfg["d_L"],user_ids=user_ids,page_ids=page_ids,ad_ids=ad_ids,ad_type_mapping=ad_type_mapping,event_type=event_type, topic=cfg["producer.py"]["produce_to"])
+        gen=generator.MMMPGenerator(throughput=int(sys.argv[2]),producer=producer,lambda_H=int(1.5)*int(sys.argv[2]),d_H=cfg["d_H"],d_L=cfg["d_L"],user_ids=user_ids,page_ids=page_ids,ad_ids=ad_ids,ad_type_mapping=ad_type_mapping,event_type=event_type, topic=cfg["producer.py"]["produce_to"])
 
 simulated_time=0
 windowid=0
