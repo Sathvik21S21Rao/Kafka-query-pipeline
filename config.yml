@@ -70,6 +70,14 @@ spark:
     consumer_group: "result_group"
     linger_ms: 1
     max_retries: 2000
+  watermark.py:
+    consume_from:
+      - "event"
+    produce_to: "watermark"
+    offset_reset: "earliest"
+    consumer_group: "watermark_group"
+    linger_ms: 1
+    max_retries: 500
   
 
 
