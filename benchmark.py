@@ -8,7 +8,7 @@ def run_benchmark(cfg):
     num_producers = int(cfg["num_producers"])
     num_consumers = int(cfg["num_consumers"])
     proc_type = cfg["proc_type"].upper()
-    dump_data(proc_type=proc_type.lower())
+    #dump_data(proc_type=proc_type.lower())
     create_kafka_topics(topics=cfg[cfg['proc_type']]['topics'],bootstrap_servers=cfg['bootstrap_servers'])
     throughputs = cfg["throughputs"]
 
@@ -42,8 +42,8 @@ def run_benchmark(cfg):
         for p in producer_processes:
             p.wait()
 
-        result_process = subprocess.Popen(['python', '-m', f'benchmark.{proc_type}Procs.result'])
-        result_process.wait()
+        #result_process = subprocess.Popen(['python', '-m', f'benchmark.{proc_type}Procs.result'])
+        #result_process.wait()
         
 
 

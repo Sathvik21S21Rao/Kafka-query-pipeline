@@ -25,20 +25,20 @@ while retries < max_retries:
         continue
     for topic_partition, messages in msg_pack.items():
         for message in messages:
+        
             data = message.value
             timestamp = message.timestamp
             window_start = data.get("window_start")
             campaign_id = data.get("campaign_id")
-            views = data.get("views")
-            clicks = data.get("clicks")
             ctr = data.get("ctr")
             max_produce_time=data.get("max_produce_time")
-            max_proc_time=data.get("max_proc_time")
-
-            end_to_end_latencies[window_start]=max(end_to_end_latencies.get(window_start,0),timestamp-max_produce_time)
-            query_time_latencies[window_start]=max(query_time_latencies.get(window_start,0),timestamp-max_proc_time)
+            print(max_produce_time)
+            try:
+                end_to_end_latencies[window_start]=max(end_to_end_latencies.get(window_start,0),timestamp-max_produce_time)
+            except:
+                pass
     retries = 0  
 
     
-logger.info(f"Result.py: {end_to_end_latencies}\n{query_time_latencies}")
+logger.info(f"Result.py: {end_to_end_latencies}")
 

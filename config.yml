@@ -3,7 +3,7 @@ bootstrap_servers: "127.0.0.1:9092"
 proc_type: 'spark'
 producer.py:
   produce_to: "event"
-  linger_ms: 1
+  linger_ms: 5
 sql:
   db_insert.py:
     consume_from: 
@@ -55,7 +55,7 @@ spark:
   app_name: "KafkaSparkSQLApp"
   topics:
     event: 
-      num_partitions: 2
+      num_partitions: 4
       replication_factor: 1
     query_results:
       num_partitions: 1
@@ -66,16 +66,16 @@ spark:
     offset_reset: "earliest"
     consumer_group: "result_group"
     linger_ms: 1
-    max_retries: 1000
+    max_retries: 200
   
 
 
 num_producers: 5
 num_consumers: 5
-num_partitions: 5
+num_partitions: 3
 duration: 100
 mode: "poisson" # mmmp or poisson
 d_H: 0.5
 d_L: 0.5
 throughputs:
-  - 10000
+  - 60000

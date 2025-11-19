@@ -13,7 +13,7 @@ def dump_data(pickle_path="data.pkl",proc_type="sql"):
     ad_ids = [str(uuid.uuid4()) for _ in range(1000)]
     ad_type_mapping = {ad_id: random.choice(["image", "video", "carousel"]) for ad_id in ad_ids}
     event_type = ['view', 'click', 'purchase']
-    campaign_id = [i for i in range(100)]
+    campaign_id = [i for i in range(10)]
     ad_to_campaign_mapping = {ad_id: campaign_id[i % len(campaign_id)] for i, ad_id in enumerate(ad_ids)}
 
     # write pickled data
@@ -84,4 +84,4 @@ def dump_data(pickle_path="data.pkl",proc_type="sql"):
             conn.close()
 
 if __name__ == "__main__":
-    dump_data()
+    dump_data(proc_type="spark")
