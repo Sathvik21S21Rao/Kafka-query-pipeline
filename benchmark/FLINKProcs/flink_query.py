@@ -99,7 +99,10 @@ t_env.execute_sql(f"""
         window_start STRING,
         campaign_id INT,
         ctr DOUBLE,
-        max_produce_time BIGINT
+        max_produce_time BIGINT,
+        WM STRING,
+        PT STRING
+
     ) WITH (
       'connector' = 'kafka',
       'topic' = '{OUTPUT_TOPIC}',
@@ -117,8 +120,8 @@ SELECT
         CAST(SUM(CASE WHEN A.event_type = 'click' THEN 1 ELSE 0 END) AS DOUBLE) /
         (SUM(CASE WHEN A.event_type = 'view' THEN 1 ELSE 0 END) + 1) AS ctr,
         MAX(A.produce_time) AS max_produce_time,
-        CAST(CURRENT_WATERMARK(event_time) AS STRING),
-    CAST(PROCTIME() AS STRING),
+        CAST(CURRENT_WATERMARK(event_time) AS STRING) AS WM,
+    CAST(PROCTIME() AS STRING) AS PT
     FROM
         kafka_source AS A
     INNER JOIN
