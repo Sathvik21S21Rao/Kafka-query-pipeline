@@ -78,4 +78,4 @@ mode: "poisson" # mmmp or poisson
 d_H: 0.5
 d_L: 0.5
 throughputs:
-  - 60000
+  - 90000
